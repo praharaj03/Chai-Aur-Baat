@@ -23,6 +23,9 @@
 # misc
 .DS_Store
 *.pem
+*.webm
+*.mp3
+audio.mp3
 
 # debug
 npm-debug.log*
