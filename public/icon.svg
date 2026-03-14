@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f0015"/>
+      <stop offset="100%" stop-color="#1a0a2e"/>
+    </linearGradient>
+    <linearGradient id="neon" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f97316"/>
+      <stop offset="50%" stop-color="#ec4899"/>
+      <stop offset="100%" stop-color="#a855f7"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="0.8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="32" height="32" rx="7" fill="url(#bg)"/>
+
+  <!-- Neon border -->
+  <rect x="0.75" y="0.75" width="30.5" height="30.5" rx="6.5" fill="none" stroke="url(#neon)" stroke-width="0.75" opacity="0.6" filter="url(#glow)"/>
+
+  <!-- Saucer -->
+  <ellipse cx="15" cy="25" rx="9" ry="2.2" fill="none" stroke="url(#neon)" stroke-width="1.2" filter="url(#glow)"/>
+  <ellipse cx="15" cy="25" rx="9" ry="2.2" fill="url(#neon)" opacity="0.12"/>
+
+  <!-- Cup body -->
+  <path d="M8.5 13 L9.8 22 Q10.1 23.2 11.2 23.2 L18.8 23.2 Q19.9 23.2 20.2 22 L21.5 13 Z" fill="url(#neon)" opacity="0.2" filter="url(#glow)"/>
+  <path d="M8.5 13 L9.8 22 Q10.1 23.2 11.2 23.2 L18.8 23.2 Q19.9 23.2 20.2 22 L21.5 13 Z" fill="none" stroke="url(#neon)" stroke-width="1.1" stroke-linejoin="round" filter="url(#glow)"/>
+
+  <!-- Cup rim -->
+  <line x1="8.5" y1="13" x2="21.5" y2="13" stroke="url(#neon)" stroke-width="1.1" stroke-linecap="round" filter="url(#glow)"/>
+
+  <!-- Handle -->
+  <path d="M21.5 15.5 Q26 15.5 26 18.5 Q26 21.5 21.5 21.5" fill="none" stroke="url(#neon)" stroke-width="1.2" stroke-linecap="round" filter="url(#glow)"/>
+
+  <!-- Steam -->
+  <path d="M12 11.5 Q11.2 9.5 12 7.5" fill="none" stroke="url(#neon)" stroke-width="0.9" stroke-linecap="round" opacity="0.85" filter="url(#glow)"/>
+  <path d="M15 10.5 Q14.2 8.5 15 6.5" fill="none" stroke="url(#neon)" stroke-width="0.9" stroke-linecap="round" opacity="0.85" filter="url(#glow)"/>
+  <path d="M18 11.5 Q17.2 9.5 18 7.5" fill="none" stroke="url(#neon)" stroke-width="0.9" stroke-linecap="round" opacity="0.85" filter="url(#glow)"/>
+</svg>
