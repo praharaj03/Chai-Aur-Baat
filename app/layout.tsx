@@ -8,9 +8,7 @@ const inter = Inter({
   weight: ["400", "500", "600", "700", "800", "900"],
 });
 
-const BASE_URL = process.env.VERCEL_URL
-  ? `https://${process.env.VERCEL_URL}`
-  : process.env.NEXT_PUBLIC_SITE_URL ?? "https://chai-aur-baat-ds8g-3tixrkqdt-praharaj25.vercel.app";
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://chai-aur-baat-ds8g-3tixrkqdt-praharaj25.vercel.app";
 
 export const metadata: Metadata = {
   title: "CHAI AUR BAAT — AI Chat",
