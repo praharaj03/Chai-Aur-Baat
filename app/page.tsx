@@ -79,7 +79,7 @@ export default function Home() {
           </div>
         </div>
         <div>
-          <p className="text-sm text-white leading-none tracking-widest" style={{ fontFamily: "var(--font-russo)" }}>CHAI AUR BAAT</p>
+          <p className="text-sm text-white leading-none tracking-widest font-bold">CHAI AUR BAAT</p>
           <p className="text-[10px] text-white/30 mt-0.5 tracking-[0.2em] uppercase">AI companion · always online</p>
         </div>
 
@@ -112,7 +112,7 @@ export default function Home() {
                 <TeaCup className="w-full h-full" />
               </motion.div>
               <div>
-                <h1 className="text-3xl bg-gradient-to-r from-orange-300 via-pink-300 to-violet-300 bg-clip-text text-transparent tracking-wider" style={{ fontFamily: "var(--font-russo)" }}>
+                <h1 className="text-3xl font-black bg-gradient-to-r from-orange-300 via-pink-300 to-violet-300 bg-clip-text text-transparent tracking-wider">
                   CHAI AUR BAAT
                 </h1>
                 <p className="text-white/40 text-xs mt-2 max-w-xs tracking-widest uppercase">

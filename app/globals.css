@@ -7,12 +7,12 @@
 body {
   background: var(--background);
   color: white;
-  font-family: var(--font-orbitron), sans-serif;
+  font-family: var(--font-roboto), sans-serif;
   overflow: hidden;
 }
 
-h1, h2, .font-russo {
-  font-family: var(--font-russo), sans-serif;
+h1, h2 {
+  font-family: var(--font-roboto), sans-serif;
 }
 
 /* Custom scrollbar */

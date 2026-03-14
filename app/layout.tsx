@@ -1,15 +1,9 @@
 import type { Metadata } from "next";
-import { Russo_One, Orbitron } from "next/font/google";
+import { Roboto } from "next/font/google";
 import "./globals.css";
 
-const russo = Russo_One({
-  variable: "--font-russo",
-  subsets: ["latin"],
-  weight: "400",
-});
-
-const orbitron = Orbitron({
-  variable: "--font-orbitron",
+const roboto = Roboto({
+  variable: "--font-roboto",
   subsets: ["latin"],
   weight: ["400", "700", "900"],
 });
@@ -56,7 +50,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${russo.variable} ${orbitron.variable} antialiased`}>
+      <body className={`${roboto.variable} antialiased`}>
         {children}
       </body>
     </html>
