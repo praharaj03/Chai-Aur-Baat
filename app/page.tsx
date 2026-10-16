@@ -210,7 +210,7 @@ export default function Home() {
                 </p>
               </div>
               <div className="flex flex-wrap gap-2 justify-center mt-2">
-                {["Ek joke sunao 😄", "Kya kar sakte ho?", "Ek poem likho 🌸", "Koi fun fact batao"].map((s) => (
+                {["Tell me a joke 😄", "What can you help with?", "Write me a poem 🌸", "Share a fun fact"].map((s) => (
                   <motion.button
                     key={s}
                     whileHover={{ scale: 1.05 }}

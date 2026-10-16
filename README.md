@@ -11,6 +11,8 @@ A beautiful AI chat companion built with Next.js, Groq, and Framer Motion.
 - 📱 Fully responsive
 - 🔍 SEO + Open Graph optimized
 - ⚡ Powered by Groq (openai/gpt-oss-20b)
+- 🌐 Live web retrieval and citations for factual and current questions
+- 🇬🇧 English-only assistant responses
 - 💜 UPI subscription checkout with a locally generated QR code
 
 ## Getting Started
