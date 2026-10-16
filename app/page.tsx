@@ -1,9 +1,12 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 
 type Message = { role: "user" | "assistant"; content: string };
+const FREE_MESSAGE_LIMIT = 5;
 
 const TeaCup = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 24 24" className={className} fill="none">
@@ -22,7 +25,7 @@ const GeminiLoader = () => (
     {[0, 1, 2, 3, 4].map((i) => (
       <motion.div
         key={i}
-        className="h-1 rounded-full bg-gradient-to-r from-orange-400 via-pink-400 to-violet-400"
+        className="h-1 rounded-full bg-gradient-to-r from-violet-400 via-fuchsia-400 to-indigo-400"
         animate={{ scaleX: [1, 2.5, 1], opacity: [0.4, 1, 0.4] }}
         transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.15, ease: "easeInOut" }}
         style={{ width: "6px", transformOrigin: "left" }}
@@ -32,11 +35,13 @@ const GeminiLoader = () => (
 );
 
 export default function Home() {
+  const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
   const [error, setError] = useState("");
+  const [remainingMessages, setRemainingMessages] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<Message[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -45,12 +50,30 @@ export default function Home() {
   useEffect(() => { messagesRef.current = messages; }, [messages]);
 
   useEffect(() => {
+    let active = true;
+    fetch("/api/chat", { cache: "no-store" })
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Could not load message quota");
+        const data: { remaining: number } = await res.json();
+        if (active) setRemainingMessages(data.remaining);
+      })
+      .catch(() => {
+        if (active) setError("Could not load your free-message balance. Refresh and try again.");
+      });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamingText, streaming]);
 
   const send = useCallback(async () => {
     const text = input.trim();
     if (!text || streaming) return;
+    if (remainingMessages === 0) {
+      router.push("/subscribe");
+      return;
+    }
 
     const userMsg: Message = { role: "user", content: text };
     const updated = [...messagesRef.current, userMsg];
@@ -74,7 +97,15 @@ export default function Home() {
         return;
       }
 
+      if (res.status === 402) {
+        setRemainingMessages(0);
+        router.push("/subscribe");
+        setStreaming(false);
+        return;
+      }
+
       if (!res.ok || !res.body) throw new Error("Bad response");
+      setRemainingMessages((remaining) => Math.max(0, (remaining ?? FREE_MESSAGE_LIMIT) - 1));
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -96,7 +127,7 @@ export default function Home() {
 
     setStreaming(false);
     inputRef.current?.focus();
-  }, [input, streaming]);
+  }, [input, remainingMessages, router, streaming]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -106,13 +137,13 @@ export default function Home() {
   }, [send]);
 
   return (
-    <div className="relative flex flex-col h-screen overflow-hidden bg-[#030712]">
+    <div className="relative flex flex-col h-screen overflow-hidden bg-[#070511]">
 
       {/* Aurora blobs */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="aurora-blob absolute -top-40 -left-40 w-[600px] h-[600px] rounded-full bg-orange-600/20 blur-[120px]" />
-        <div className="aurora-blob absolute -bottom-40 -right-40 w-[600px] h-[600px] rounded-full bg-violet-600/20 blur-[120px]" style={{ animationDelay: "4s" }} />
-        <div className="aurora-blob absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full bg-pink-600/10 blur-[100px]" style={{ animationDelay: "8s" }} />
+        <div className="aurora-blob absolute -top-40 -left-40 w-[600px] h-[600px] rounded-full bg-violet-600/25 blur-[120px]" />
+        <div className="aurora-blob absolute -bottom-40 -right-40 w-[600px] h-[600px] rounded-full bg-indigo-600/20 blur-[120px]" style={{ animationDelay: "4s" }} />
+        <div className="aurora-blob absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full bg-fuchsia-600/10 blur-[100px]" style={{ animationDelay: "8s" }} />
       </div>
 
       {/* Dot grid */}
@@ -129,20 +160,25 @@ export default function Home() {
         className="relative z-10 flex items-center gap-3 px-6 py-4 border-b border-white/[0.06] backdrop-blur-xl bg-white/[0.03]"
       >
         <div className="float">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-orange-500 via-pink-500 to-violet-500 flex items-center justify-center shadow-lg shadow-orange-500/30 p-1.5">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-indigo-500 flex items-center justify-center shadow-lg shadow-violet-500/30 p-1.5">
             <TeaCup className="w-full h-full" />
           </div>
         </div>
         <div>
           <p className="text-sm text-white leading-none tracking-widest font-bold">CHAI AUR BAAT</p>
-          <p className="text-[10px] text-white/30 mt-0.5 tracking-[0.2em] uppercase">AI companion · always online</p>
+          <p className="text-[10px] text-white/40 mt-0.5 tracking-[0.16em] uppercase">Your ideas, in good company</p>
         </div>
         <div className="ml-auto flex items-center gap-1.5">
           <span className="relative flex h-2 w-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
           </span>
-          <span className="text-xs text-white/30">online</span>
+          <span className="text-xs text-white/40">
+            {remainingMessages === null ? "checking free messages…" : `${remainingMessages} free ${remainingMessages === 1 ? "message" : "messages"} left`}
+          </span>
+          <Link href="/subscribe" className="ml-3 rounded-full border border-violet-400/30 bg-violet-500/10 px-3 py-1.5 text-xs font-medium text-violet-200 transition hover:border-violet-300/60 hover:bg-violet-500/20">
+            Go premium
+          </Link>
         </div>
       </motion.header>
 
@@ -161,16 +197,16 @@ export default function Home() {
               <motion.div
                 animate={{ scale: [1, 1.05, 1] }}
                 transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                className="w-20 h-20 rounded-2xl bg-gradient-to-br from-orange-500 via-pink-500 to-violet-500 flex items-center justify-center shadow-2xl shadow-orange-500/40 p-4"
+                className="w-20 h-20 rounded-2xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-indigo-500 flex items-center justify-center shadow-2xl shadow-violet-500/40 p-4"
               >
                 <TeaCup className="w-full h-full" />
               </motion.div>
               <div>
-                <h1 className="text-3xl font-black bg-gradient-to-r from-orange-300 via-pink-300 to-violet-300 bg-clip-text text-transparent tracking-wider">
-                  CHAI AUR BAAT
+                <h1 className="text-3xl font-black bg-gradient-to-r from-violet-200 via-fuchsia-200 to-indigo-200 bg-clip-text text-transparent tracking-wider">
+                  A LITTLE CHAI. A LOT OF CLARITY.
                 </h1>
-                <p className="text-white/40 text-xs mt-2 max-w-xs tracking-widest uppercase">
-                  Apne AI companion se baat karo ☕
+                <p className="text-white/50 text-xs mt-2 max-w-xs tracking-[0.16em] uppercase">
+                  Your curious, always-on conversation companion
                 </p>
               </div>
               <div className="flex flex-wrap gap-2 justify-center mt-2">
@@ -198,13 +234,13 @@ export default function Home() {
               className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"} gap-2`}
             >
               {msg.role === "assistant" && (
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-orange-500 via-pink-500 to-violet-500 flex items-center justify-center shrink-0 mt-1 shadow-md shadow-orange-500/30 p-1">
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 via-fuchsia-500 to-indigo-500 flex items-center justify-center shrink-0 mt-1 shadow-md shadow-violet-500/30 p-1">
                   <TeaCup className="w-full h-full" />
                 </div>
               )}
               <div className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-line backdrop-blur-md ${
                 msg.role === "user"
-                  ? "bg-gradient-to-br from-orange-600/80 via-pink-600/80 to-violet-600/80 text-white rounded-br-sm border border-orange-400/20 shadow-lg shadow-orange-500/20"
+                  ? "bg-gradient-to-br from-violet-600/80 via-fuchsia-600/80 to-indigo-600/80 text-white rounded-br-sm border border-violet-400/20 shadow-lg shadow-violet-500/20"
                   : "bg-white/[0.06] border border-white/[0.08] text-white/90 rounded-bl-sm shadow-lg"
               }`}>
                 {msg.content}
@@ -220,7 +256,7 @@ export default function Home() {
               animate={{ opacity: 1, y: 0 }}
               className="flex justify-start gap-2"
             >
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-orange-500 via-pink-500 to-violet-500 flex items-center justify-center shrink-0 mt-1 shadow-md shadow-orange-500/30 p-1">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 via-fuchsia-500 to-indigo-500 flex items-center justify-center shrink-0 mt-1 shadow-md shadow-violet-500/30 p-1">
                 <TeaCup className="w-full h-full" />
               </div>
               <div className="max-w-[75%] px-4 py-2.5 rounded-2xl rounded-bl-sm bg-white/[0.06] border border-white/[0.08] text-white/90 text-sm leading-relaxed shadow-lg backdrop-blur-md">
@@ -229,7 +265,7 @@ export default function Home() {
                     <span className="whitespace-pre-line">{streamingText}</span>
                     {/* Gemini cursor blink */}
                     <motion.span
-                      className="inline-block w-0.5 h-3.5 bg-orange-400 ml-0.5 align-middle rounded-full"
+                      className="inline-block w-0.5 h-3.5 bg-violet-400 ml-0.5 align-middle rounded-full"
                       animate={{ opacity: [1, 0] }}
                       transition={{ duration: 0.6, repeat: Infinity }}
                     />
@@ -271,32 +307,39 @@ export default function Home() {
         <div className="max-w-2xl mx-auto flex gap-2 items-center">
           <input
             ref={inputRef}
-            className="flex-1 bg-white/[0.06] border border-white/[0.1] hover:border-orange-500/40 focus:border-orange-500/70 rounded-xl px-4 py-3 text-sm text-white placeholder-white/25 focus:outline-none transition backdrop-blur-md"
-            placeholder="Kuch bolo... ☕"
+            className="flex-1 bg-white/[0.06] border border-white/[0.1] hover:border-violet-500/40 focus:border-violet-400/70 rounded-xl px-4 py-3 text-sm text-white placeholder-white/25 focus:outline-none transition backdrop-blur-md"
+            placeholder={remainingMessages === 0 ? "Unlock unlimited conversations to keep chatting" : "Ask anything. Your next great idea starts here…"}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            disabled={streaming}
+            disabled={streaming || remainingMessages === 0}
           />
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.92 }}
-            onClick={send}
-            disabled={!input.trim() || streaming}
-            className="bg-gradient-to-br from-orange-600 via-pink-600 to-violet-600 hover:from-orange-500 hover:via-pink-500 hover:to-violet-500 disabled:opacity-30 disabled:cursor-not-allowed text-white px-4 py-3 rounded-xl transition shadow-lg shadow-orange-500/30"
-          >
-            {streaming ? (
-              <motion.div
-                className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
-                animate={{ rotate: 360 }}
-                transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}
-              />
-            ) : (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-              </svg>
-            )}
-          </motion.button>
+          {remainingMessages === 0 ? (
+            <Link href="/subscribe" className="whitespace-nowrap rounded-xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-900/40 transition hover:bg-violet-500">
+              Unlock chat
+            </Link>
+          ) : (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.92 }}
+              onClick={send}
+              disabled={!input.trim() || streaming}
+              aria-label="Send message"
+              className="bg-gradient-to-br from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 disabled:opacity-30 disabled:cursor-not-allowed text-white px-4 py-3 rounded-xl transition shadow-lg shadow-violet-500/30"
+            >
+              {streaming ? (
+                <motion.div
+                  className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}
+                />
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+              )}
+            </motion.button>
+          )}
         </div>
       </motion.div>
 

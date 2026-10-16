@@ -1,7 +1,68 @@
 import { groq } from "@/lib/groq";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 // In-memory rate limit: 10 requests per minute per IP
 const rateLimitMap = new Map<string, { count: number; reset: number }>();
+const FREE_MESSAGE_LIMIT = 5;
+const QUOTA_COOKIE = "free_message_count";
+const QUOTA_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
+
+function signMessageCount(count: number): string {
+  const secret = process.env.GROQ_API_KEY;
+  if (!secret) throw new Error("GROQ_API_KEY is not set in environment variables");
+
+  return createHmac("sha256", secret).update(String(count)).digest("base64url");
+}
+
+function getMessageCount(request: Request): number {
+  const cookie = request.headers.get("cookie")
+    ?.split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${QUOTA_COOKIE}=`))
+    ?.slice(QUOTA_COOKIE.length + 1);
+
+  if (!cookie) return 0;
+
+  const [countText, signature, ...extra] = cookie.split(".");
+  const count = Number(countText);
+  if (
+    extra.length > 0 ||
+    !Number.isInteger(count) ||
+    count < 0 ||
+    count > FREE_MESSAGE_LIMIT ||
+    !signature
+  ) {
+    return 0;
+  }
+
+  const expected = signMessageCount(count);
+  const suppliedBuffer = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expected);
+  if (
+    suppliedBuffer.length !== expectedBuffer.length ||
+    !timingSafeEqual(suppliedBuffer, expectedBuffer)
+  ) {
+    return 0;
+  }
+
+  return count;
+}
+
+function quotaCookie(count: number, request: Request): string {
+  const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
+  return `${QUOTA_COOKIE}=${count}.${signMessageCount(count)}; Max-Age=${QUOTA_COOKIE_MAX_AGE}; Path=/; HttpOnly; SameSite=Lax${secure}`;
+}
+
+function quotaResponse(request: Request): Response {
+  const used = getMessageCount(request);
+  return new Response(JSON.stringify({ used, remaining: FREE_MESSAGE_LIMIT - used, limit: FREE_MESSAGE_LIMIT }), {
+    headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+  });
+}
+
+export function GET(request: Request) {
+  return quotaResponse(request);
+}
 
 function checkRateLimit(ip: string): { allowed: boolean; retryAfter?: number } {
   const now = Date.now();
@@ -24,6 +85,14 @@ function checkRateLimit(ip: string): { allowed: boolean; retryAfter?: number } {
 }
 
 export async function POST(req: Request) {
+  const usedMessages = getMessageCount(req);
+  if (usedMessages >= FREE_MESSAGE_LIMIT) {
+    return new Response(JSON.stringify({ error: "Your 5 free messages are used. Subscribe to keep chatting.", remaining: 0 }), {
+      status: 402,
+      headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+    });
+  }
+
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   const { allowed, retryAfter } = checkRateLimit(ip);
 
@@ -45,7 +114,7 @@ export async function POST(req: Request) {
     }
 
     const stream = await groq.chat.completions.create({
-      model: "llama-3.1-8b-instant",
+      model: "openai/gpt-oss-20b",
       stream: true,
       messages: [
         {
@@ -68,7 +137,12 @@ export async function POST(req: Request) {
     });
 
     return new Response(readable, {
-      headers: { "Content-Type": "text/plain; charset=utf-8", "X-Content-Type-Options": "nosniff" },
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "X-Content-Type-Options": "nosniff",
+        "Cache-Control": "no-store",
+        "Set-Cookie": quotaCookie(usedMessages + 1, req),
+      },
     });
   } catch (error) {
     console.error("Chat error:", error);
