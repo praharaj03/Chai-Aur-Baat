@@ -11,7 +11,7 @@ A beautiful AI chat companion built with Next.js, Google Gemini, and Framer Moti
 - 📱 Fully responsive
 - 🔍 SEO + Open Graph optimized
 - ⚡ Powered by Gemini 3.8 Flash
-- 🌐 Google Search grounding and source links for factual questions
+- ℹ️ Clearly flags questions that need current information or source verification
 - 🇬🇧 English-only assistant responses
 - 💜 UPI subscription checkout with a locally generated QR code
 
