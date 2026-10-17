@@ -208,7 +208,7 @@ export async function POST(req: Request) {
     }
 
     const apiUrl = new URL(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent",
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:streamGenerateContent",
     );
     apiUrl.searchParams.set("alt", "sse");
 
@@ -229,9 +229,21 @@ export async function POST(req: Request) {
     });
 
     if (!geminiResponse.ok || !geminiResponse.body) {
-      const providerError = await geminiResponse.text();
+      const providerError: unknown = await geminiResponse.json().catch(() => null);
       console.error("Gemini API error:", geminiResponse.status, providerError);
-      return jsonResponse({ error: `Gemini request failed (${geminiResponse.status}). Check your API key and quota.` }, 502);
+      if (geminiResponse.status === 429) {
+        return jsonResponse({
+          error: "Gemini API quota exceeded. Check your Google AI Studio rate limits and billing, then try again.",
+        }, 429);
+      }
+      if (geminiResponse.status === 404) {
+        return jsonResponse({
+          error: "The configured Gemini model is unavailable. Please contact the site owner.",
+        }, 502);
+      }
+      return jsonResponse({
+        error: `Gemini request failed (${geminiResponse.status}). Check the API key and project access.`,
+      }, 502);
     }
 
     const encoder = new TextEncoder();

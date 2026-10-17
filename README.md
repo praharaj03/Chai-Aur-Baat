@@ -10,7 +10,7 @@ A beautiful AI chat companion built with Next.js, Google Gemini, and Framer Moti
 - 🚦 Rate limiting (10 requests/min per IP)
 - 📱 Fully responsive
 - 🔍 SEO + Open Graph optimized
-- ⚡ Powered by Gemini 2.5 Flash
+- ⚡ Powered by Gemini 3.8 Flash
 - 🌐 Google Search grounding and source links for factual questions
 - 🇬🇧 English-only assistant responses
 - 💜 UPI subscription checkout with a locally generated QR code
