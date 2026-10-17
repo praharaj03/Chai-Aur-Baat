@@ -135,7 +135,7 @@ export default function OGImage() {
             }}
           />
           <span style={{ color: "rgba(255,255,255,0.5)", fontSize: "16px", letterSpacing: "2px" }}>
-            POWERED BY GROQ AI
+            POWERED BY GEMINI AI
           </span>
         </div>
       </div>

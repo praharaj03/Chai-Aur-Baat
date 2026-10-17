@@ -2,11 +2,9 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 
 type Message = { role: "user" | "assistant"; content: string };
-const FREE_MESSAGE_LIMIT = 5;
 
 const TeaCup = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 24 24" className={className} fill="none">
@@ -35,13 +33,13 @@ const GeminiLoader = () => (
 );
 
 export default function Home() {
-  const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
   const [error, setError] = useState("");
   const [remainingMessages, setRemainingMessages] = useState<number | null>(null);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<Message[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -49,19 +47,37 @@ export default function Home() {
   // Keep ref in sync for use inside async callbacks
   useEffect(() => { messagesRef.current = messages; }, [messages]);
 
+  const refreshQuota = useCallback(async () => {
+    const res = await fetch("/api/chat", { cache: "no-store" });
+    if (!res.ok) throw new Error("Could not load message quota");
+    const data: { remaining: number; waitSeconds: number } = await res.json();
+    setRemainingMessages(data.remaining);
+    setCooldownSeconds(data.waitSeconds);
+  }, []);
+
   useEffect(() => {
     let active = true;
-    fetch("/api/chat", { cache: "no-store" })
-      .then(async (res) => {
-        if (!res.ok) throw new Error("Could not load message quota");
-        const data: { remaining: number } = await res.json();
-        if (active) setRemainingMessages(data.remaining);
-      })
-      .catch(() => {
-        if (active) setError("Could not load your free-message balance. Refresh and try again.");
-      });
+    refreshQuota().catch(() => {
+      if (active) setError("Could not load your free-message balance. Refresh and try again.");
+    });
     return () => { active = false; };
-  }, []);
+  }, [refreshQuota]);
+
+  useEffect(() => {
+    if (cooldownSeconds <= 0) return;
+
+    const timer = window.setTimeout(() => {
+      if (cooldownSeconds === 1) {
+        refreshQuota().catch(() => {
+          setError("Could not refresh your free-message balance. Try again.");
+        });
+      } else {
+        setCooldownSeconds((seconds) => seconds - 1);
+      }
+    }, 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [cooldownSeconds, refreshQuota]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -70,10 +86,7 @@ export default function Home() {
   const send = useCallback(async () => {
     const text = input.trim();
     if (!text || streaming) return;
-    if (remainingMessages === 0) {
-      router.push("/subscribe");
-      return;
-    }
+    if (remainingMessages === 0) return;
 
     const userMsg: Message = { role: "user", content: text };
     const updated = [...messagesRef.current, userMsg];
@@ -91,22 +104,21 @@ export default function Home() {
       });
 
       if (res.status === 429) {
-        const data = await res.json();
-        setError(data.error);
-        setStreaming(false);
-        return;
+        const data: { error?: string; waitSeconds?: number; cooldown?: boolean } = await res.json();
+        if (data.cooldown) {
+          setRemainingMessages(0);
+          setCooldownSeconds(data.waitSeconds ?? 0);
+          setError(data.error || "Please wait before sending another message.");
+          setStreaming(false);
+          return;
+        }
+        throw new Error(data.error || "You’re sending messages too quickly. Please try again shortly.");
       }
 
-      if (res.status === 402) {
-        setRemainingMessages(0);
-        router.push("/subscribe");
-        setStreaming(false);
-        return;
+      if (!res.ok || !res.body) {
+        const data: { error?: string } = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Something went wrong. Try again.");
       }
-
-      if (!res.ok || !res.body) throw new Error("Bad response");
-      setRemainingMessages((remaining) => Math.max(0, (remaining ?? FREE_MESSAGE_LIMIT) - 1));
-
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let full = "";
@@ -121,13 +133,14 @@ export default function Home() {
 
       setMessages([...updated, { role: "assistant", content: full }]);
       setStreamingText("");
-    } catch {
-      setError("Something went wrong. Try again.");
+      await refreshQuota();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Something went wrong. Try again.");
     }
 
     setStreaming(false);
     inputRef.current?.focus();
-  }, [input, remainingMessages, router, streaming]);
+  }, [input, remainingMessages, refreshQuota, streaming]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -174,7 +187,13 @@ export default function Home() {
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
           </span>
           <span className="text-xs text-white/40">
-            {remainingMessages === null ? "checking free messages…" : `${remainingMessages} free ${remainingMessages === 1 ? "message" : "messages"} left`}
+            {remainingMessages === null
+              ? "checking free messages…"
+              : cooldownSeconds > 0
+                ? `Free chats resume in ${Math.floor(cooldownSeconds / 60)}:${String(cooldownSeconds % 60).padStart(2, "0")}`
+                : remainingMessages === 0
+                  ? "Refreshing free messages…"
+                  : `${remainingMessages} free ${remainingMessages === 1 ? "message" : "messages"} left`}
           </span>
           <Link href="/subscribe" className="ml-3 rounded-full border border-violet-400/30 bg-violet-500/10 px-3 py-1.5 text-xs font-medium text-violet-200 transition hover:border-violet-300/60 hover:bg-violet-500/20">
             Go premium
@@ -308,7 +327,7 @@ export default function Home() {
           <input
             ref={inputRef}
             className="flex-1 bg-white/[0.06] border border-white/[0.1] hover:border-violet-500/40 focus:border-violet-400/70 rounded-xl px-4 py-3 text-sm text-white placeholder-white/25 focus:outline-none transition backdrop-blur-md"
-            placeholder={remainingMessages === 0 ? "Unlock unlimited conversations to keep chatting" : "Ask anything. Your next great idea starts here…"}
+            placeholder={cooldownSeconds > 0 ? "Wait for your free messages or upgrade to skip the wait" : "Ask anything. Your next great idea starts here…"}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -316,7 +335,7 @@ export default function Home() {
           />
           {remainingMessages === 0 ? (
             <Link href="/subscribe" className="whitespace-nowrap rounded-xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-900/40 transition hover:bg-violet-500">
-              Unlock chat
+              Skip the wait
             </Link>
           ) : (
             <motion.button

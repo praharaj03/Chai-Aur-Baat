@@ -12,14 +12,14 @@ const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://chai-aur-baat-ds8g
 
 export const metadata: Metadata = {
   title: "CHAI AUR BAAT — AI Chat",
-  description: "Chai aur baat karo apne AI companion ke saath. A friendly AI chatbot powered by Groq.",
-  keywords: ["AI chat", "chatbot", "Chai Aur Baat", "Groq AI", "Hindi chatbot", "AI companion"],
+  description: "Chai aur baat karo apne AI companion ke saath. A friendly AI chatbot powered by Gemini.",
+  keywords: ["AI chat", "chatbot", "Chai Aur Baat", "Gemini AI", "Hindi chatbot", "AI companion"],
   authors: [{ name: "Chai Aur Baat" }],
   icons: { icon: "/icon.svg" },
   metadataBase: new URL(BASE_URL),
   openGraph: {
     title: "CHAI AUR BAAT — AI Chat",
-    description: "Apne AI companion se baat karo. Powered by Groq AI.",
+    description: "Apne AI companion se baat karo. Powered by Gemini AI.",
     url: BASE_URL,
     siteName: "Chai Aur Baat",
     images: [
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "CHAI AUR BAAT — AI Chat",
-    description: "Apne AI companion se baat karo. Powered by Groq AI.",
+    description: "Apne AI companion se baat karo. Powered by Gemini AI.",
     images: ["/opengraph-image"],
   },
 };

@@ -46,8 +46,8 @@ export default function SubscribePage() {
               </span>
             </h1>
             <p className="mt-5 max-w-lg text-base leading-7 text-white/60">
-              Enjoy five free messages, then go Plus for more room to think,
-              explore, and keep the conversation flowing.
+              Enjoy five free messages at a time. Wait three minutes for the
+              next free set, or request a Plus subscription to skip the wait.
             </p>
 
             <div className="mt-9 flex items-end gap-3">
@@ -63,8 +63,8 @@ export default function SubscribePage() {
 
             <p className="mt-8 text-xs leading-5 text-white/40">
               After paying, share your UPI transaction reference with the account
-              owner through your usual contact channel. Access is confirmed
-              manually; this version does not activate subscriptions automatically.
+              owner through your usual contact channel. Plus access is confirmed
+              manually and is not activated automatically by this version.
             </p>
           </div>
 
