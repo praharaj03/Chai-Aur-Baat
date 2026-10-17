@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 // In-memory rate limit: 10 requests per minute per IP
 const rateLimitMap = new Map<string, { count: number; reset: number }>();
-const GEMINI_REQUESTS_PER_MINUTE = 5;
+const GEMINI_REQUESTS_PER_MINUTE = 15;
 const geminiRequestTimes: number[] = [];
 const FREE_MESSAGE_LIMIT = 5;
 const FREE_MESSAGE_COOLDOWN_MS = 3 * 60 * 1000;
@@ -230,7 +230,7 @@ export async function POST(req: Request) {
     }
 
     const apiUrl = new URL(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:streamGenerateContent",
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:streamGenerateContent",
     );
     apiUrl.searchParams.set("alt", "sse");
 
