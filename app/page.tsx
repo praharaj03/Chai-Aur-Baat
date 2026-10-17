@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
+import CrystalizedBall from "@/components/CrystalizedBall";
 
 type Message = { role: "user" | "assistant"; content: string };
 
@@ -15,21 +16,6 @@ const TeaCup = ({ className }: { className?: string }) => (
     <path d="M12 7.5 Q11.5 5.5 12 4" stroke="white" strokeWidth="1.1" strokeLinecap="round" opacity="0.7"/>
     <path d="M15 8 Q14.5 6 15 4.5" stroke="white" strokeWidth="1.1" strokeLinecap="round" opacity="0.7"/>
   </svg>
-);
-
-// Gemini-style shimmer loader
-const GeminiLoader = () => (
-  <div className="flex gap-1 items-center px-1 py-1">
-    {[0, 1, 2, 3, 4].map((i) => (
-      <motion.div
-        key={i}
-        className="h-1 rounded-full bg-gradient-to-r from-violet-400 via-fuchsia-400 to-indigo-400"
-        animate={{ scaleX: [1, 2.5, 1], opacity: [0.4, 1, 0.4] }}
-        transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.15, ease: "easeInOut" }}
-        style={{ width: "6px", transformOrigin: "left" }}
-      />
-    ))}
-  </div>
 );
 
 export default function Home() {
@@ -290,7 +276,18 @@ export default function Home() {
                     />
                   </>
                 ) : (
-                  <GeminiLoader />
+                  <div className="flex items-center gap-2" role="status" aria-label="AI is thinking">
+                    <div className="h-14 w-14 shrink-0 overflow-hidden rounded-full">
+                      <CrystalizedBall
+                        preset="plasma"
+                        color="#C084FC"
+                        size={0.78}
+                        particleCount={2500}
+                        interactive={false}
+                      />
+                    </div>
+                    <span className="text-xs text-white/60">Thinking…</span>
+                  </div>
                 )}
               </div>
             </motion.div>
