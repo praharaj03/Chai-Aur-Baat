@@ -2,8 +2,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 // In-memory rate limit: 10 requests per minute per IP
 const rateLimitMap = new Map<string, { count: number; reset: number }>();
-const GEMINI_REQUESTS_PER_MINUTE = 15;
-const geminiRequestTimes: number[] = [];
+const PROVIDER_REQUESTS_PER_MINUTE = 15;
+const providerRequestTimes: number[] = [];
 const FREE_MESSAGE_LIMIT = 5;
 const FREE_MESSAGE_COOLDOWN_MS = 3 * 60 * 1000;
 const QUOTA_COOKIE = "free_message_count";
@@ -14,10 +14,45 @@ const SYSTEM_INSTRUCTION =
 type ChatMessage = { role: "user" | "assistant"; content: string };
 type QuotaState = { used: number; cooldownUntil: number };
 
+type ProviderConfig = {
+  kind: "gemini" | "openai-compatible";
+  apiKey: string;
+  model: string;
+  baseUrl: string;
+};
+
+function getProvider(): ProviderConfig | null {
+  const kind = (process.env.LLM_PROVIDER || "gemini").toLowerCase();
+  const apiKey = kind === "gemini"
+    ? process.env.GEMINI_API_KEY
+    : process.env.LLM_API_KEY;
+  if (!apiKey) return null;
+
+  if (kind === "gemini") {
+    return {
+      kind,
+      apiKey,
+      model: process.env.LLM_MODEL || "gemini-3.5-flash-lite",
+      baseUrl: process.env.LLM_BASE_URL || "https://generativelanguage.googleapis.com/v1beta",
+    };
+  }
+  if (kind === "openai-compatible") {
+    const baseUrl = process.env.LLM_BASE_URL;
+    const model = process.env.LLM_MODEL;
+    if (!baseUrl || !model) return null;
+    return { kind, apiKey, model, baseUrl: baseUrl.replace(/\/$/, "") };
+  }
+  return null;
+}
+
+function getProviderKey(): string | undefined {
+  return getProvider()?.apiKey;
+}
+
 function getCookieSecret(): string {
-  const secret = process.env.CHAT_COOKIE_SECRET || process.env.GEMINI_API_KEY;
+  const secret = process.env.CHAT_COOKIE_SECRET || getProviderKey();
   if (!secret) {
-    throw new Error("GEMINI_API_KEY is not set in environment variables");
+    throw new Error("Configure the selected LLM provider or set CHAT_COOKIE_SECRET");
   }
   return secret;
 }
@@ -107,7 +142,7 @@ export function GET(request: Request) {
     return response;
   } catch (error) {
     console.error("Chat configuration error:", error);
-    return jsonResponse({ error: "Chat is not configured. Set GEMINI_API_KEY." }, 503);
+    return jsonResponse({ error: "Chat is not configured. Check the selected LLM provider settings." }, 503);
   }
 }
 
@@ -130,19 +165,19 @@ function checkRateLimit(ip: string): { allowed: boolean; retryAfter?: number } {
   return { allowed: true };
 }
 
-function checkGeminiRateLimit(now = Date.now()): { allowed: boolean; retryAfter?: number } {
-  while (geminiRequestTimes.length > 0 && geminiRequestTimes[0] <= now - 60_000) {
-    geminiRequestTimes.shift();
+function checkProviderRateLimit(now = Date.now()): { allowed: boolean; retryAfter?: number } {
+  while (providerRequestTimes.length > 0 && providerRequestTimes[0] <= now - 60_000) {
+    providerRequestTimes.shift();
   }
 
-  if (geminiRequestTimes.length >= GEMINI_REQUESTS_PER_MINUTE) {
+  if (providerRequestTimes.length >= PROVIDER_REQUESTS_PER_MINUTE) {
     return {
       allowed: false,
-      retryAfter: Math.max(1, Math.ceil((geminiRequestTimes[0] + 60_000 - now) / 1000)),
+      retryAfter: Math.max(1, Math.ceil((providerRequestTimes[0] + 60_000 - now) / 1000)),
     };
   }
 
-  geminiRequestTimes.push(now);
+  providerRequestTimes.push(now);
   return { allowed: true };
 }
 
@@ -169,8 +204,9 @@ function getText(parts: unknown): string {
 }
 
 export async function POST(req: Request) {
-  if (!process.env.GEMINI_API_KEY) {
-    return jsonResponse({ error: "Chat is not configured. Set GEMINI_API_KEY." }, 503);
+  const provider = getProvider();
+  if (!provider) {
+    return jsonResponse({ error: "Chat is not configured. Check LLM_PROVIDER and its required environment variables." }, 503);
   }
 
   let quota: QuotaState;
@@ -179,7 +215,7 @@ export async function POST(req: Request) {
     ({ state: quota, refreshCookie } = getQuotaState(req));
   } catch (error) {
     console.error("Chat configuration error:", error);
-    return jsonResponse({ error: "Chat is not configured. Set GEMINI_API_KEY." }, 503);
+    return jsonResponse({ error: "Chat is not configured. Check LLM_PROVIDER and its required environment variables." }, 503);
   }
 
   if (quota.cooldownUntil > Date.now()) {
@@ -213,9 +249,9 @@ export async function POST(req: Request) {
       return jsonResponse({ error: "Please provide a non-empty list of valid messages." }, 400);
     }
 
-    const geminiRate = checkGeminiRateLimit();
-    if (!geminiRate.allowed) {
-      const waitSeconds = geminiRate.retryAfter ?? 60;
+    const providerRate = checkProviderRateLimit();
+    if (!providerRate.allowed) {
+      const waitSeconds = providerRate.retryAfter ?? 60;
       return new Response(JSON.stringify({
         error: `Chat is temporarily busy. Please wait ${waitSeconds}s before trying again.`,
         waitSeconds,
@@ -229,32 +265,41 @@ export async function POST(req: Request) {
       });
     }
 
-    const apiUrl = new URL(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:streamGenerateContent",
-    );
-    apiUrl.searchParams.set("alt", "sse");
-
-    const geminiResponse = await fetch(apiUrl, {
+    const apiUrl = provider.kind === "gemini"
+      ? new URL(`${provider.baseUrl}/models/${provider.model}:streamGenerateContent?alt=sse`)
+      : new URL(`${provider.baseUrl}/chat/completions`);
+    const providerResponse = await fetch(apiUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-goog-api-key": process.env.GEMINI_API_KEY,
+        ...(provider.kind === "gemini"
+          ? { "x-goog-api-key": provider.apiKey }
+          : { Authorization: `Bearer ${provider.apiKey}` }),
       },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-        contents: body.messages.map((message: ChatMessage) => ({
-          role: message.role === "assistant" ? "model" : "user",
-          parts: [{ text: message.content }],
-        })),
-      }),
+      body: JSON.stringify(provider.kind === "gemini"
+        ? {
+            systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+            contents: body.messages.map((message: ChatMessage) => ({
+              role: message.role === "assistant" ? "model" : "user",
+              parts: [{ text: message.content }],
+            })),
+          }
+        : {
+            model: provider.model,
+            stream: true,
+            messages: [
+              { role: "system", content: SYSTEM_INSTRUCTION },
+              ...body.messages,
+            ],
+          }),
     });
 
-    if (!geminiResponse.ok || !geminiResponse.body) {
-      const providerError: unknown = await geminiResponse.json().catch(() => null);
-      console.error("Gemini API error:", geminiResponse.status, providerError);
-      if (geminiResponse.status === 429) {
+    if (!providerResponse.ok || !providerResponse.body) {
+      const providerError: unknown = await providerResponse.json().catch(() => null);
+      console.error("LLM provider API error:", providerResponse.status, providerError);
+      if (providerResponse.status === 429) {
         return new Response(JSON.stringify({
-          error: "Gemini is temporarily rate-limited. Please wait a minute and try again. If this keeps happening, check the Google AI Studio daily quota for this project.",
+          error: "The AI provider is temporarily rate-limited. Please wait a minute and try again.",
           waitSeconds: 60,
         }), {
           status: 429,
@@ -265,20 +310,15 @@ export async function POST(req: Request) {
           },
         });
       }
-      if (geminiResponse.status === 404) {
-        return jsonResponse({
-          error: "The configured Gemini model is unavailable. Please contact the site owner.",
-        }, 502);
-      }
       return jsonResponse({
-        error: `Gemini request failed (${geminiResponse.status}). Check the API key and project access.`,
+        error: `The AI provider request failed (${providerResponse.status}). Check the provider URL, model, and API key.`,
       }, 502);
     }
 
     const encoder = new TextEncoder();
     const readable = new ReadableStream({
       async start(controller) {
-        const reader = geminiResponse.body!.getReader();
+        const reader = providerResponse.body!.getReader();
         const decoder = new TextDecoder();
         let pending = "";
 
@@ -292,6 +332,15 @@ export async function POST(req: Request) {
 
           const chunk: unknown = JSON.parse(data);
           if (!chunk || typeof chunk !== "object") return;
+          if (provider.kind === "openai-compatible") {
+            const choices = "choices" in chunk ? chunk.choices : undefined;
+            if (!Array.isArray(choices) || !choices[0] || typeof choices[0] !== "object") return;
+            const delta = "delta" in choices[0] ? choices[0].delta : undefined;
+            if (delta && typeof delta === "object" && "content" in delta && typeof delta.content === "string") {
+              controller.enqueue(encoder.encode(delta.content));
+            }
+            return;
+          }
           const candidates = "candidates" in chunk ? chunk.candidates : undefined;
           if (!Array.isArray(candidates) || !candidates[0] || typeof candidates[0] !== "object") return;
 
@@ -316,7 +365,7 @@ export async function POST(req: Request) {
 
           controller.close();
         } catch (error) {
-          console.error("Gemini stream error:", error);
+          console.error("LLM provider stream error:", error);
           controller.error(error);
         } finally {
           reader.releaseLock();
@@ -339,6 +388,6 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error("Chat error:", error);
-    return jsonResponse({ error: "Failed to get a response from Gemini. Please try again." }, 502);
+    return jsonResponse({ error: "Failed to get a response from the AI provider. Please try again." }, 502);
   }
 }
