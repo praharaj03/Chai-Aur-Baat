@@ -31,7 +31,7 @@ npm run dev
 | `GEMINI_API_KEY` | Gemini API key, required when `LLM_PROVIDER=gemini` |
 | `LLM_API_KEY` | API key for an OpenAI-compatible provider |
 | `LLM_BASE_URL` | Optional Gemini API base (defaults to Google's API); required for `openai-compatible`, usually ending in `/v1` |
-| `LLM_MODEL` | Model name; defaults to `gemini-3.5-flash-lite` for Gemini and is required for `openai-compatible` |
+| `LLM_MODEL` | Model name; defaults to `gemini-3.8-flash` for Gemini and is required for `openai-compatible` |
 | `CHAT_COOKIE_SECRET` | Optional stable secret for signing the free-message quota cookie; otherwise the selected provider's API key is used |
 | `NEXT_PUBLIC_SITE_URL` | Your production URL (for OG image) |
 | `NEXT_PUBLIC_SUBSCRIPTION_PRICE_INR` | Subscription QR amount in INR (defaults to `99`) |

@@ -32,7 +32,7 @@ function getProvider(): ProviderConfig | null {
     return {
       kind,
       apiKey,
-      model: process.env.LLM_MODEL || "gemini-3.5-flash-lite",
+      model: process.env.LLM_MODEL || "gemini-3.8-flash",
       baseUrl: process.env.LLM_BASE_URL || "https://generativelanguage.googleapis.com/v1beta",
     };
   }
